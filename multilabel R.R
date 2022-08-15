@@ -1,4 +1,4 @@
-#Downloading the required packages
+# Downloading the required packages
 library(tidyverse)
 library(readxl)
 library(tm)
@@ -19,26 +19,26 @@ library(randomForest)
 
 ################################################################################
 
-# 1. DATABASE WITH COMMENTS
+# 1. WORKING WITH COMMENTS DATABASE (bigdata.xlsx) 
 
-#Loading data
-# good = What do you like about the organization
-# bad = What needs to be improved
+# Loading data
 path <- "bigdata.xlsx"
 
+## good = "What do you think makes our Company a good employer?"
 good <- data.frame(read_excel(path, sheet = 1))
+## bad = "What do you think should be improved in our Company to make it a better employer?"
 bad <- data.frame(read_excel(path, sheet = 2))
 
 good$id <- as.character(good$id)
 bad$id <- as.character(bad$id)
 
-#Remove duplicate id
+# Remove duplicate id
 length(unique(good$id)) == nrow(good)
 length(unique(bad$id)) == nrow(bad)
 good <- good[!duplicated(good$id), ]
 bad <- bad[!duplicated(bad$id), ]
 
-#Data cleaning
+# Data cleaning
 good_clean <- good %>% 
   mutate(text = tolower(text),
          text = removePunctuation(text),
@@ -51,14 +51,14 @@ bad_clean <- bad %>%
          text = removeNumbers(text),
          text = stripWhitespace(text))
 
-#Stemming
+# Stemming
 good_stem <- good_clean %>% 
   mutate(text = stemDocument(text, language = "russian"))
 
 bad_stem <- bad_clean %>% 
   mutate(text = stemDocument(text, language = "russian"))
 
-#Tokenizers
+# Tokenizers
 good_token_prep <- itoken(good_stem$text,
                           ids = good_stem$id,
                           tokenizer = word_tokenizer)
@@ -67,11 +67,11 @@ bad_token_prep <- itoken(bad_stem$text,
                          ids = bad_stem$id,
                          tokenizer = word_tokenizer)
 
-#Loading stop words
-stop_words <- c(stopwords(language = "ru", source = "snowball"), "«", "»") %>% 
+# Loading stop words
+stop_words <- c(stopwords(language = "ru", source = "snowball"), "Â«", "Â»") %>% 
   stemDocument(., language = "russian")
 
-#Dictionaries with mono- and bigrams
+# Dictionaries with mono- and bigrams
 good_vocab <- prune_vocabulary(create_vocabulary(good_token_prep, 
                                                  stopwords = stop_words, 
                                                  ngram = c(1L,2L)),
@@ -85,7 +85,7 @@ bad_vocab <- prune_vocabulary(create_vocabulary(bad_token_prep,
                               doc_proportion_min = 0.005,
                               doc_proportion_max = 0.90)
 
-#Document-term matrix
+# Document-term matrix
 good_term_document <- create_dtm(good_token_prep, 
                                  vocab_vectorizer(good_vocab)) %>% 
   as.matrix() %>% 
@@ -100,26 +100,26 @@ bad_term_document <- create_dtm(bad_token_prep,
 
 ################################################################################
 
-# 2. DATABASE WITH CATEGORIES
+# 2. WORKING WITH CATEGORIES DATABASE (categories.xlsx) 
 
-#Loading data
-# g = What do you like about the organization
-# b = What needs to be improved
+# Loading data
 p <- "categories.xlsx"
 
+## g = "What do you think makes our Company a good employer?"
 g <- data.frame(read_excel(p, sheet = 1))
+## b = "What do you think should be improved in our Company to make it a better employer?"
 b <- data.frame(read_excel(p, sheet = 2))
 
 g$id <- as.character(g$id)
 b$id <- as.character(b$id)
 
-#Óäàëÿþ ïîâòîðÿþùèåñÿ id
+#Ã“Ã¤Ã Ã«Ã¿Ã¾ Ã¯Ã®Ã¢Ã²Ã®Ã°Ã¿Ã¾Ã¹Ã¨Ã¥Ã±Ã¿ id
 length(unique(g$id)) == nrow(g)
 length(unique(b$id)) == nrow(b)
 g <- g[!duplicated(g$id), ]
 b <- b[!duplicated(b$id), ]
 
-#Ìåíÿþ NA íà 0
+#ÃŒÃ¥Ã­Ã¿Ã¾ NA Ã­Ã  0
 g[is.na(g)] <- 0
 b[is.na(b)] <- 0
 
@@ -127,15 +127,15 @@ b[is.na(b)] <- 0
 
 # 3. COMBINING DATABASES
 
-#One big table - categories and term-document
+# Creating one big table - categories and term-document
 good_employer <- merge(x = g, y = good_term_document)
 development_zones <- merge(x = b, y = bad_term_document)
 
-#Remove id so they don't become predictors in models
+# Remove ids so they don't become predictors in models
 good_employer <- good_employer[,-1] 
 development_zones <- development_zones[,-1] 
 
-#Converting one large table to Multilabel Datasets (MLD) + deleting observations without categories
+# Converting one big table to Multilabel Datasets (MLD) + deleting observations without categories
 good_employer_mldr <- mldr_from_dataframe(good_employer, 
                                           labelIndices = c(1:13), 
                                           name = "testMLDR") %>% 
@@ -145,11 +145,11 @@ development_zones_mldr <- mldr_from_dataframe(development_zones,
                                               name = "testMLDR") %>% 
   remove_unlabeled_instances()
 
-#Small 5% samples (for sample models)
+# Small 5% samples (for sample models)
 small_good_employer <- good_employer %>% sample_frac(size = 0.05)
 small_development_zones <- development_zones %>% sample_frac(size = 0.05)
 
-#Convert small 5% samples to MLD
+# Convert small 5% samples to MLD
 small_good_employer_mldr <- mldr_from_dataframe(small_good_employer, 
                                                 labelIndices = c(1:13), 
                                                 name = "testMLDR")
@@ -157,7 +157,7 @@ small_development_zones_mldr <- mldr_from_dataframe(small_development_zones,
                                                     labelIndices = c(1:12), 
                                                     name = "testMLDR")
 
-#Create training samples and validation samples
+# Create training samples and validation samples
 data_small <- create_holdout_partition(small_good_employer_mldr, 
                                        c(train=0.7, test=0.3))
 data <- create_holdout_partition(good_employer_mldr, 
@@ -172,42 +172,43 @@ data_b <- create_holdout_partition(development_zones_mldr,
 
 # 4. DESCRIPTIVE STATISTICS AND GRAPHS
 
-#Category names = numbers, for nicer charts
+# Category names = numbers, for prettier charts
 goemp <- good_employer
 
-goemp$`1` <- good_employer$`Çàðàáîòíàÿ.ïëàòà`
-goemp$`2` <- good_employer$`Íåìàòåðèàëüíàÿ.ìîòèâàöèÿ`
-goemp$`3` <- good_employer$`Ñîáëþäåíèå.îáÿçàòåëüñòâ.è.Òðóäîâîãî.Êîäåêñà.ðàáîòîäàòåëåì`
-goemp$`4` <- good_employer$`Ãðàôèê.è.óñëîâèÿ.òðóäà`
-goemp$`5` <- good_employer$`Îáó÷åíèå..ïðîôåññèîíàëüíîå.ðàçâèòèå`
-goemp$`6` <- good_employer$`Ðóêîâîäñòâî`
-goemp$`7` <- good_employer$`Àòìîñôåðà.è.êîëëåãè`
-goemp$`8` <- good_employer$`Âíèìàòåëüíîå.îòíîøåíèå.ê.ñîòðóäíèêàì`
-goemp$`9` <- good_employer$`Áèçíåñ.ïðîöåññû.è.îðãàíèçàöèÿ.ðàáîòû`
-goemp$`10` <- good_employer$`Êàðüåðíûå.âîçìîæíîñòè`
-goemp$`11` <- good_employer$`Èíòåðåñíàÿ.ðàáîòà`
-goemp$`12` <- good_employer$`Ïîëîæåíèå.êîìïàíèè.íà.ðûíêå.òðóäà..ðåïóòàöèÿ.è.áðåíä` 
-goemp$`13` <- good_employer$`Ïðîôåññèîíàëüíàÿ.ñðåäà`
+goemp$`1` <- good_employer$`Ã‡Ã Ã°Ã Ã¡Ã®Ã²Ã­Ã Ã¿.Ã¯Ã«Ã Ã²Ã `
+goemp$`2` <- good_employer$`ÃÃ¥Ã¬Ã Ã²Ã¥Ã°Ã¨Ã Ã«Ã¼Ã­Ã Ã¿.Ã¬Ã®Ã²Ã¨Ã¢Ã Ã¶Ã¨Ã¿`
+goemp$`3` <- good_employer$`Ã‘Ã®Ã¡Ã«Ã¾Ã¤Ã¥Ã­Ã¨Ã¥.Ã®Ã¡Ã¿Ã§Ã Ã²Ã¥Ã«Ã¼Ã±Ã²Ã¢.Ã¨.Ã’Ã°Ã³Ã¤Ã®Ã¢Ã®Ã£Ã®.ÃŠÃ®Ã¤Ã¥ÃªÃ±Ã .Ã°Ã Ã¡Ã®Ã²Ã®Ã¤Ã Ã²Ã¥Ã«Ã¥Ã¬`
+goemp$`4` <- good_employer$`ÃƒÃ°Ã Ã´Ã¨Ãª.Ã¨.Ã³Ã±Ã«Ã®Ã¢Ã¨Ã¿.Ã²Ã°Ã³Ã¤Ã `
+goemp$`5` <- good_employer$`ÃŽÃ¡Ã³Ã·Ã¥Ã­Ã¨Ã¥..Ã¯Ã°Ã®Ã´Ã¥Ã±Ã±Ã¨Ã®Ã­Ã Ã«Ã¼Ã­Ã®Ã¥.Ã°Ã Ã§Ã¢Ã¨Ã²Ã¨Ã¥`
+goemp$`6` <- good_employer$`ÃÃ³ÃªÃ®Ã¢Ã®Ã¤Ã±Ã²Ã¢Ã®`
+goemp$`7` <- good_employer$`Ã€Ã²Ã¬Ã®Ã±Ã´Ã¥Ã°Ã .Ã¨.ÃªÃ®Ã«Ã«Ã¥Ã£Ã¨`
+goemp$`8` <- good_employer$`Ã‚Ã­Ã¨Ã¬Ã Ã²Ã¥Ã«Ã¼Ã­Ã®Ã¥.Ã®Ã²Ã­Ã®Ã¸Ã¥Ã­Ã¨Ã¥.Ãª.Ã±Ã®Ã²Ã°Ã³Ã¤Ã­Ã¨ÃªÃ Ã¬`
+goemp$`9` <- good_employer$`ÃÃ¨Ã§Ã­Ã¥Ã±.Ã¯Ã°Ã®Ã¶Ã¥Ã±Ã±Ã».Ã¨.Ã®Ã°Ã£Ã Ã­Ã¨Ã§Ã Ã¶Ã¨Ã¿.Ã°Ã Ã¡Ã®Ã²Ã»`
+goemp$`10` <- good_employer$`ÃŠÃ Ã°Ã¼Ã¥Ã°Ã­Ã»Ã¥.Ã¢Ã®Ã§Ã¬Ã®Ã¦Ã­Ã®Ã±Ã²Ã¨`
+goemp$`11` <- good_employer$`ÃˆÃ­Ã²Ã¥Ã°Ã¥Ã±Ã­Ã Ã¿.Ã°Ã Ã¡Ã®Ã²Ã `
+goemp$`12` <- good_employer$`ÃÃ®Ã«Ã®Ã¦Ã¥Ã­Ã¨Ã¥.ÃªÃ®Ã¬Ã¯Ã Ã­Ã¨Ã¨.Ã­Ã .Ã°Ã»Ã­ÃªÃ¥.Ã²Ã°Ã³Ã¤Ã ..Ã°Ã¥Ã¯Ã³Ã²Ã Ã¶Ã¨Ã¿.Ã¨.Ã¡Ã°Ã¥Ã­Ã¤` 
+goemp$`13` <- good_employer$`ÃÃ°Ã®Ã´Ã¥Ã±Ã±Ã¨Ã®Ã­Ã Ã«Ã¼Ã­Ã Ã¿.Ã±Ã°Ã¥Ã¤Ã `
 
 goemp <- goemp[,-c(1:13)]
 
 devzo <- development_zones
 
-devzo$`1` <- development_zones$`Çàðàáîòíàÿ.ïëàòà`
-devzo$`2` <- development_zones$`Íåìàòåðèàëüíàÿ.ìîòèâàöèÿ`
-devzo$`3` <- development_zones$`Ãðàôèê.è.óñëîâèÿ.òðóäà`
-devzo$`4` <- development_zones$`Îáó÷åíèå..ïðîôåññèîíàëüíîå.ðàçâèòèå`
-devzo$`5` <- development_zones$`Ðóêîâîäñòâî`
-devzo$`6` <- development_zones$`Àòìîñôåðà.è.êîëëåãè`
-devzo$`7` <- development_zones$`Âçàèìîäåéñòâèå.ìåæäó.ïîäðàçäåëåíèÿìè`
-devzo$`8` <- development_zones$`Áèçíåñ.ïðîöåññû.è.îðãàíèçàöèÿ.ðàáîòû`
-devzo$`9` <- development_zones$`Èíôîðìèðîâàíèå..íàëè÷èå.îáðàòíîé.ñâÿçè`
-devzo$`10` <- development_zones$`Êàðüåðíûå.âîçìîæíîñòè`
-devzo$`11` <- development_zones$`Êàäðû.è.HR.ïðàêòèêè`
-devzo$`12` <- development_zones$`Îáîðóäîâàíèå..òåõíè÷åñêàÿ.îñíàùåííîñòü`
+devzo$`1` <- development_zones$`Ã‡Ã Ã°Ã Ã¡Ã®Ã²Ã­Ã Ã¿.Ã¯Ã«Ã Ã²Ã `
+devzo$`2` <- development_zones$`ÃÃ¥Ã¬Ã Ã²Ã¥Ã°Ã¨Ã Ã«Ã¼Ã­Ã Ã¿.Ã¬Ã®Ã²Ã¨Ã¢Ã Ã¶Ã¨Ã¿`
+devzo$`3` <- development_zones$`ÃƒÃ°Ã Ã´Ã¨Ãª.Ã¨.Ã³Ã±Ã«Ã®Ã¢Ã¨Ã¿.Ã²Ã°Ã³Ã¤Ã `
+devzo$`4` <- development_zones$`ÃŽÃ¡Ã³Ã·Ã¥Ã­Ã¨Ã¥..Ã¯Ã°Ã®Ã´Ã¥Ã±Ã±Ã¨Ã®Ã­Ã Ã«Ã¼Ã­Ã®Ã¥.Ã°Ã Ã§Ã¢Ã¨Ã²Ã¨Ã¥`
+devzo$`5` <- development_zones$`ÃÃ³ÃªÃ®Ã¢Ã®Ã¤Ã±Ã²Ã¢Ã®`
+devzo$`6` <- development_zones$`Ã€Ã²Ã¬Ã®Ã±Ã´Ã¥Ã°Ã .Ã¨.ÃªÃ®Ã«Ã«Ã¥Ã£Ã¨`
+devzo$`7` <- development_zones$`Ã‚Ã§Ã Ã¨Ã¬Ã®Ã¤Ã¥Ã©Ã±Ã²Ã¢Ã¨Ã¥.Ã¬Ã¥Ã¦Ã¤Ã³.Ã¯Ã®Ã¤Ã°Ã Ã§Ã¤Ã¥Ã«Ã¥Ã­Ã¨Ã¿Ã¬Ã¨`
+devzo$`8` <- development_zones$`ÃÃ¨Ã§Ã­Ã¥Ã±.Ã¯Ã°Ã®Ã¶Ã¥Ã±Ã±Ã».Ã¨.Ã®Ã°Ã£Ã Ã­Ã¨Ã§Ã Ã¶Ã¨Ã¿.Ã°Ã Ã¡Ã®Ã²Ã»`
+devzo$`9` <- development_zones$`ÃˆÃ­Ã´Ã®Ã°Ã¬Ã¨Ã°Ã®Ã¢Ã Ã­Ã¨Ã¥..Ã­Ã Ã«Ã¨Ã·Ã¨Ã¥.Ã®Ã¡Ã°Ã Ã²Ã­Ã®Ã©.Ã±Ã¢Ã¿Ã§Ã¨`
+devzo$`10` <- development_zones$`ÃŠÃ Ã°Ã¼Ã¥Ã°Ã­Ã»Ã¥.Ã¢Ã®Ã§Ã¬Ã®Ã¦Ã­Ã®Ã±Ã²Ã¨`
+devzo$`11` <- development_zones$`ÃŠÃ Ã¤Ã°Ã».Ã¨.HR.Ã¯Ã°Ã ÃªÃ²Ã¨ÃªÃ¨`
+devzo$`12` <- development_zones$`ÃŽÃ¡Ã®Ã°Ã³Ã¤Ã®Ã¢Ã Ã­Ã¨Ã¥..Ã²Ã¥ÃµÃ­Ã¨Ã·Ã¥Ã±ÃªÃ Ã¿.Ã®Ã±Ã­Ã Ã¹Ã¥Ã­Ã­Ã®Ã±Ã²Ã¼`
 
 devzo <- devzo[,-c(1:12)]
 
+# Convert datasets to MLD
 gemp_mldr <- mldr_from_dataframe(goemp, 
                                  labelIndices = c(190:201), 
                                  name = "testMLDR") %>% 
@@ -218,15 +219,15 @@ devzo_mldr <- mldr_from_dataframe(devzo,
                                   name = "testMLDR") %>% 
   remove_unlabeled_instances()
 
-#Descriptive statistics for MLD
+# Descriptive statistics for MLD
 summary(gemp_mldr)
 summary(devzo_mldr)
 
-#Separately descriptive category statistics in MLD
+# Separately descriptive category statistics in MLD
 gemp_mldr$labels
 devzo_mldr$labels
 
-#Plots
+# Plots
 plot(gemp_mldr, type = "LC")
 plot(gemp_mldr, type = "LB")
 
@@ -237,7 +238,7 @@ plot(devzo_mldr, type = "LB")
 
 # 5. BUILD MODELS
 
-#Random forest
+## Random forest
 
 #1
 rf_model <- br(data$train, "RF", importance = TRUE)
@@ -280,7 +281,7 @@ round(rf_res_4, 4)
 
 ################################################################################
 
-# XGBOOST
+## XGBOOST
 
 #1
 xgb_model <- br(data$train, "XGB")
@@ -343,7 +344,7 @@ round(xgb_res_b_4, 4)
 
 ################################################################################
 
-#Naive Bayes
+# Naive Bayes
 
 nb_model <- br(data$train, "NB")
 nb_pred <- predict(nb_model, data$test)
@@ -357,7 +358,9 @@ round(nb_res_b, 4)
 
 ################################################################################
 
-#Accuracy RF models separately for each category
+## Quality Metrics
+
+# Accuracy RF models separately for each category
 cm_g_1_rf <- as.data.frame(as.matrix(multilabel_confusion_matrix(data$test, rf_pred)))
 prec_g_1_rf <- (cm_g_1_rf$TP + cm_g_1_rf$TN)  / (cm_g_1_rf$TP + cm_g_1_rf$FP + cm_g_1_rf$TN + cm_g_1_rf$FN)
 round(prec_g_1_rf, 4)
@@ -386,7 +389,7 @@ cm_g_4_rf <- as.data.frame(as.matrix(multilabel_confusion_matrix(data$test, rf_p
 prec_g_4_rf <- (cm_g_4_rf$TP + cm_g_4_rf$TN)  / (cm_g_4_rf$TP + cm_g_4_rf$FP + cm_g_4_rf$TN + cm_g_4_rf$FN)
 round(prec_g_4_rf, 4)
 
-#Accuracy XGB models separately for each category
+# Accuracy XGB models separately for each category
 cm_g_1_xgb <- as.data.frame(as.matrix(multilabel_confusion_matrix(data$test, xgb_pred)))
 prec_g_1_xgb <- (cm_g_1_xgb$TP + cm_g_1_xgb$TN) / (cm_g_1_xgb$TP + cm_g_1_xgb$FP + cm_g_1_xgb$TN + cm_g_1_xgb$FN)
 round(prec_g_1_xgb, 4)
@@ -415,7 +418,7 @@ cm_b_4_xgb <- as.data.frame(as.matrix(multilabel_confusion_matrix(data_b$test, x
 prec_b_4_xgb <- (cm_b_4_xgb$TP + cm_b_4_xgb$TN) / (cm_b_4_xgb$TP + cm_b_4_xgb$FP + cm_b_4_xgb$TN + cm_b_4_xgb$FN)
 round(prec_b_4_xgb, 4)
 
-#Accuracy NB models separately for each category
+# Accuracy NB models separately for each category
 cm_g_nb <- as.data.frame(as.matrix(multilabel_confusion_matrix(data$test, nb_pred)))
 prec_g_nb <- (cm_g_nb$TP + cm_g_nb$TN) / (cm_g_nb$TP + cm_g_nb$FP + cm_g_nb$TN + cm_g_nb$FN)
 round(prec_g_nb, 4)
@@ -426,13 +429,13 @@ round(prec_b_nb, 4)
 
 ################################################################################
 
-# Assessing the importance of predictors (substitute: 1.desired model name and 2.category name)
-imp <- as.data.frame(rf_model_b$models$Ãðàôèê.è.óñëîâèÿ.òðóäà$importanceSD)
+# Assessing the importance of predictors (substitute: desired model name and category name)
+imp <- as.data.frame(rf_model_b$models$ÃƒÃ°Ã Ã´Ã¨Ãª.Ã¨.Ã³Ã±Ã«Ã®Ã¢Ã¨Ã¿.Ã²Ã°Ã³Ã¤Ã $importanceSD)
 imp <- cbind(vars = rownames(imp), imp)
 imp <-  imp[order(imp$MeanDecreaseAccuracy), ]
 imp$vars <- factor(imp$vars, levels = unique(imp$vars))
 
-#The feature importance (Mean Decrease Accuracy) plot
+# The feature importance (Mean Decrease Accuracy) plot
 dotchart(imp$MeanDecreaseAccuracy, 
          imp$vars, xlim = c(0,max(imp$MeanDecreaseAccuracy)), pch = 16)
 
