@@ -22,3 +22,6 @@ The files below contain two sheets ("Good employer" and "Development zones") for
 The solution contains two separate models developed with supervised machine learning algorithms – random forest and gradient boosting. These models automate the content analysis process for answers to open questions in engagement studies with the accuracy of .86 and .70 respectively. Aggregated and potentially universal categories of engagement studies were identified, the categories being independent of the context of data collection.  
 
 Besides, the most important speech patterns (words and phrases) that predict to which of the categories a particular employee's response would be assigned were named. The solution can be used by companies for benchmarking factors of engagement in different domain areas.
+
+## ✅ Status
+Completed!
